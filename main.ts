@@ -7,7 +7,7 @@
 //
 // The output directory is MAKEFUN_OUTPUT_DIR when set, else /output.
 
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
@@ -26,8 +26,13 @@ const DOSSIER_CAPS = {
 
 function stageIntoOutput(): void {
   // Start from an empty output so stale files can never leak into an entry.
-  rmSync(outputDir, { recursive: true, force: true });
+  // Clear the directory's CONTENTS only: the grader runs as an unprivileged
+  // user with /output mounted read-only at its parent, so removing the
+  // output directory itself fails with EACCES (rmSync on a mount point).
   mkdirSync(outputDir, { recursive: true });
+  for (const child of readdirSync(outputDir)) {
+    rmSync(join(outputDir, child), { recursive: true, force: true });
+  }
   for (const part of ['game', 'screenshots']) {
     const from = join(repoRoot, part);
     if (!existsSync(from)) throw new Error(`main.ts: ${part}/ is missing from the repository`);
